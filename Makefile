@@ -1,29 +1,71 @@
-objects = pigmap.o blockimages.o chunk.o map.o render.o region.o rgba.o tables.o utils.o world.o
+#Compiler and Linker
+CC          := g++
 
-pigmap : $(objects)
-	g++ $(objects) -o pigmap -l z -l png -l pthread -O3
+#The Target Binary Program
+TARGET      := pigmap
 
-pigmap.o : pigmap.cpp blockimages.h chunk.h map.h render.h rgba.h tables.h utils.h world.h
-	g++ -c pigmap.cpp -O3
-blockimages.o : blockimages.cpp blockimages.h rgba.h utils.h
-	g++ -c blockimages.cpp -O3
-chunk.o : chunk.cpp chunk.h map.h region.h tables.h utils.h
-	g++ -c chunk.cpp -O3
-map.o : map.cpp map.h utils.h
-	g++ -c map.cpp -O3
-render.o : render.cpp blockimages.h chunk.h map.h render.h rgba.h tables.h utils.h
-	g++ -c render.cpp -O3
-region.o : region.cpp map.h region.h tables.h utils.h
-	g++ -c region.cpp -O3
-rgba.o : rgba.cpp rgba.h utils.h
-	g++ -c rgba.cpp -O3
-tables.o : tables.cpp map.h tables.h utils.h
-	g++ -c tables.cpp -O3
-utils.o : utils.cpp utils.h
-	g++ -c utils.cpp -O3
-world.o : world.cpp map.h region.h tables.h world.h
-	g++ -c world.cpp -O3
+#The Directories, Source, Includes, Objects, Binary and Resources
+SRCDIR      := src
+INCDIR      := inc
+BUILDDIR    := obj
+TARGETDIR   := bin
+SRCEXT      := cpp
+DEPEXT      := d
+RESDIR      := res
+OBJEXT      := o
 
-clean :
-	rm -f *.o pigmap
-	
+#Flags, Libraries and Includes
+CFLAGS      := -O3 -g
+LIB         :=  
+INC         := -I$(INCDIR) -I/usr/local/include
+INCDEP      := -I$(INCDIR)
+
+#---------------------------------------------------------------------------------
+#DO NOT EDIT BELOW THIS LINE
+#---------------------------------------------------------------------------------
+SOURCES     := $(shell find $(SRCDIR) -type f -name \*.$(SRCEXT))
+OBJECTS     := $(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.$(SRCEXT)=.$(OBJEXT)))
+
+#Defauilt Make
+all: resources $(TARGET)
+
+#Remake
+remake: cleaner all
+
+#Copy Resources from Resources Directory to Target Directory
+resources: directories
+	@cp $(RESDIR)/* $(TARGETDIR)/
+
+#Make the Directories
+directories:
+	@mkdir -p $(TARGETDIR)
+	@mkdir -p $(BUILDDIR)
+
+#Clean only Objecst
+clean:
+	@$(RM) -rf $(BUILDDIR)
+
+#Full Clean, Objects and Binaries
+cleaner: clean
+	@$(RM) -rf $(TARGETDIR)
+
+#Pull in dependency info for *existing* .o files
+-include $(OBJECTS:.$(OBJEXT)=.$(DEPEXT))
+
+#Link
+$(TARGET): $(OBJECTS)
+	$(CC) -o $(TARGETDIR)/$(TARGET) $^ $(LIB)  -l z -l png -l pthread -O3^
+
+
+#Compile
+$(BUILDDIR)/%.$(OBJEXT): $(SRCDIR)/%.$(SRCEXT)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INC) -c -o $@ $<
+	@$(CC) $(CFLAGS) $(INCDEP) -MM $(SRCDIR)/$*.$(SRCEXT) > $(BUILDDIR)/$*.$(DEPEXT)
+	@cp -f $(BUILDDIR)/$*.$(DEPEXT) $(BUILDDIR)/$*.$(DEPEXT).tmp
+	@sed -e 's|.*:|$(BUILDDIR)/$*.$(OBJEXT):|' < $(BUILDDIR)/$*.$(DEPEXT).tmp > $(BUILDDIR)/$*.$(DEPEXT)
+	@sed -e 's/.*://' -e 's/\\$$//' < $(BUILDDIR)/$*.$(DEPEXT).tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $(BUILDDIR)/$*.$(DEPEXT)
+	@rm -f $(BUILDDIR)/$*.$(DEPEXT).tmp
+
+#Non-File Targets
+.PHONY: all remake clean cleaner resources
